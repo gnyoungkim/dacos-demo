@@ -153,7 +153,7 @@ with info_col:
 
     if display_row is not None:
         r = display_row
-        st.markdown(f"<h3 style='font-size:1.8rem;'>📍 {r['학교명']}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='font-size:2.3rem;'>📍 {r['학교명']}</h3>", unsafe_allow_html=True)
         badge_col1, badge_col2 = st.columns(2)
         with badge_col1:
             color = "🔴" if r["등급"] <= 2 else "🟡" if r["등급"] == 3 else "🔵"
