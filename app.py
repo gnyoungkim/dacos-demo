@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -30,12 +29,11 @@ def circle_polygon(lon, lat, r_deg, n=14):
 
 
 @st.cache_data
-def build_grade_geojsons(df_map_json, size_map):
+def build_grade_geojsons(df_map, size_map):
     """학교급별 원 폴리곤 geojson을 미리 만들어 캐싱 (매번 새로 계산하면 느려서)."""
-    df_local = pd.read_json(df_map_json)
     result = {}
     for g, r in size_map.items():
-        sub = df_local[df_local["등급"] == g].reset_index(drop=True)
+        sub = df_map[df_map["등급"] == g].reset_index(drop=True)
         features = []
         for i, row in sub.iterrows():
             coords = circle_polygon(row["경도"], row["위도"], r)
@@ -126,7 +124,7 @@ with map_col:
     opacity_map = GRADE_OPACITY_SEARCH if is_searching else GRADE_OPACITY
 
     # 원을 실제 땅 크기 폴리곤으로 그려서, 확대하면 커지고 축소하면 작아지게 함 (핀과 동일 원리)
-    geojsons = build_grade_geojsons(df_map.to_json(), size_map)
+    geojsons = build_grade_geojsons(df_map, size_map)
 
     # 낮은 등급(5→1 순)부터 그려서, 위험도가 높을수록 항상 위에 겹쳐 보이게 함
     for g in sorted(GRADE_COLORS, reverse=True):
@@ -179,7 +177,10 @@ with info_col:
         try:
             point = event.selection["points"][0]
             curve_idx = point["curve_number"]
-            point_idx = point.get("point_index", 0)  # 핀(폴리곤) 트레이스는 point_index가 없을 수 있어 기본값 처리
+            # Choroplethmap(원·핀 폴리곤)은 point_index 대신 location 키로 반환되는 경우가 있어 둘 다 확인
+            point_idx = point.get("point_index")
+            if point_idx is None:
+                point_idx = point.get("location", 0)
             ref_df = trace_refs[curve_idx]
             if ref_df is not None and point_idx < len(ref_df):
                 clicked_row = ref_df.iloc[point_idx]
