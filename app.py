@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -10,13 +11,41 @@ THREE = ["대전", "대구", "부산"]
 SIDO_FULL = {"대전": "대전광역시", "대구": "대구광역시", "부산": "부산광역시"}
 GRADE_COLORS = {1: "#7f1d1d", 2: "#dc2626", 3: "#f97316", 4: "#fbbf24", 5: "#7dd3fc"}
 
-# 평소(검색 안 했을 때) 크기/투명도
-GRADE_SIZE = {1: 20, 2: 17, 3: 13, 4: 12, 5: 11}
+# 평소(검색 안 했을 때) 원 반지름 — 지도 위 실제 크기(도 단위). 확대하면 커지고 축소하면 작아짐
+GRADE_SIZE_DEG = {1: 0.0035, 2: 0.003, 3: 0.0022, 4: 0.002, 5: 0.0018}
 GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.8, 4: 0.75, 5: 0.7}
 
 # 검색 중일 때 — 3~5등급도 주변 맥락 파악하게 크기·진하기 상향
-GRADE_SIZE_SEARCH = {1: 20, 2: 17, 3: 16, 4: 15, 5: 14}
+GRADE_SIZE_DEG_SEARCH = {1: 0.0035, 2: 0.003, 3: 0.0028, 4: 0.0026, 5: 0.0024}
 GRADE_OPACITY_SEARCH = {1: 1.0, 2: 0.95, 3: 0.95, 4: 0.9, 5: 0.85}
+
+
+def circle_polygon(lon, lat, r_deg, n=14):
+    """지도 위경도 기준 원 폴리곤. 실제 땅 크기라 확대하면 커지고 축소하면 작아짐(핀과 동일한 방식)."""
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    xs = lon + r_deg * np.cos(angles)
+    ys = lat + r_deg * np.sin(angles)
+    coords = list(zip(xs, ys)) + [(xs[0], ys[0])]
+    return coords
+
+
+@st.cache_data
+def build_grade_geojsons(df_map_json, size_map):
+    """학교급별 원 폴리곤 geojson을 미리 만들어 캐싱 (매번 새로 계산하면 느려서)."""
+    df_local = pd.read_json(df_map_json)
+    result = {}
+    for g, r in size_map.items():
+        sub = df_local[df_local["등급"] == g].reset_index(drop=True)
+        features = []
+        for i, row in sub.iterrows():
+            coords = circle_polygon(row["경도"], row["위도"], r)
+            features.append({
+                "type": "Feature", "id": i,
+                "geometry": {"type": "Polygon", "coordinates": [coords]},
+                "properties": {},
+            })
+        result[g] = ({"type": "FeatureCollection", "features": features}, sub)
+    return result
 
 # 유형별 배지 색상 — 순전출형은 파란 계열, 인구감소형은 빨간 계열, 비위험은 회색
 TYPE_STYLE = {
@@ -93,19 +122,22 @@ with map_col:
 
     # 검색 중이면 3~5등급도 크고 진하게 보이는 값을 쓴다
     is_searching = len(matched) > 0
-    size_map = GRADE_SIZE_SEARCH if is_searching else GRADE_SIZE
+    size_map = GRADE_SIZE_DEG_SEARCH if is_searching else GRADE_SIZE_DEG
     opacity_map = GRADE_OPACITY_SEARCH if is_searching else GRADE_OPACITY
+
+    # 원을 실제 땅 크기 폴리곤으로 그려서, 확대하면 커지고 축소하면 작아지게 함 (핀과 동일 원리)
+    geojsons = build_grade_geojsons(df_map.to_json(), size_map)
 
     # 낮은 등급(5→1 순)부터 그려서, 위험도가 높을수록 항상 위에 겹쳐 보이게 함
     for g in sorted(GRADE_COLORS, reverse=True):
         color = GRADE_COLORS[g]
-        sub = df_map[df_map["등급"] == g].reset_index(drop=True)
+        geojson_g, sub = geojsons[g]
         trace_refs.append(sub)
-        fig.add_trace(go.Scattermap(
-            lat=sub["위도"], lon=sub["경도"], mode="markers",
-            marker=dict(size=size_map[g], color=color, opacity=opacity_map[g]),
-            text=sub["학교명"],
-            hoverinfo="text", name=f"{g}등급",
+        fig.add_trace(go.Choroplethmap(
+            geojson=geojson_g, locations=list(range(len(sub))), z=[1] * len(sub),
+            colorscale=[[0, color], [1, color]], showscale=False,
+            marker=dict(opacity=opacity_map[g], line=dict(width=0)),
+            hovertext=sub["학교명"], hoverinfo="text", name=f"{g}등급",
         ))
 
     # 검색된 학교 — 진짜 핀(물방울) 모양 다각형. 색은 그 학교의 등급 색 그대로.
