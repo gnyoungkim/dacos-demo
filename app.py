@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import geopandas as gpd
 import plotly.graph_objects as go
 
@@ -16,6 +17,16 @@ GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.8, 4: 0.75, 5: 0.7}
 # 검색 강조 배율 — 색은 그대로, 크기만 키우고 완전 불투명으로
 HIGHLIGHT_SIZE_MULT = 2.2
 HIGHLIGHT_OPACITY = 1.0
+
+
+def pin_polygon(lon, lat, size_deg=0.015, n=24):
+    """지도 위경도 기준 핀(물방울) 모양 폴리곤 좌표를 만든다. 뾰족한 끝이 정확히 학교 위치(lon, lat)."""
+    head_lat = lat + size_deg * 1.4
+    angles = np.linspace(np.radians(200), np.radians(-20), n)
+    arc_lon = lon + size_deg * np.cos(angles)
+    arc_lat = head_lat + size_deg * np.sin(angles)
+    coords = list(zip(arc_lon, arc_lat)) + [(lon, lat), (arc_lon[0], arc_lat[0])]
+    return coords
 
 
 @st.cache_data
@@ -76,19 +87,27 @@ with map_col:
             hoverinfo="text", name=f"{g}등급",
         ))
 
-    # 검색된 학교 — 등급별 원래 색 그대로, 핀 모양 + 크기 확대로 강조
+    # 검색된 학교 — 진짜 핀(물방울) 모양 다각형. 색은 그 학교의 등급 색 그대로.
     if len(matched) > 0:
-        for g in matched["등급"].unique():
-            m_sub = matched[matched["등급"] == g].reset_index(drop=True)
-            trace_refs.append(m_sub)
-            fig.add_trace(go.Scattermap(
-                lat=m_sub["위도"], lon=m_sub["경도"], mode="markers",
-                marker=dict(size=GRADE_SIZE[g] * HIGHLIGHT_SIZE_MULT,
-                            color=GRADE_COLORS[g], opacity=HIGHLIGHT_OPACITY,
-                            symbol="marker"),  # 동그라미 대신 지도 핀 모양
-                text=m_sub["학교명"] + " (검색됨)",
-                hoverinfo="text", name="검색 결과",
+        for i, m_row in matched.iterrows():
+            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.012)
+            pin_geojson = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature", "id": 0,
+                    "geometry": {"type": "Polygon", "coordinates": [coords]},
+                    "properties": {},
+                }],
+            }
+            g = int(m_row["등급"])
+            fig.add_trace(go.Choroplethmap(
+                geojson=pin_geojson, locations=[0], z=[1],
+                colorscale=[[0, GRADE_COLORS[g]], [1, GRADE_COLORS[g]]], showscale=False,
+                marker=dict(opacity=1.0, line=dict(width=1.5, color="white")),
+                hovertext=m_row["학교명"] + " (검색됨)", hoverinfo="text",
+                name="검색 결과",
             ))
+            trace_refs.append(pd.DataFrame([m_row]))  # 핀 트레이스도 클릭하면 정보 뜨게 등록
 
     fig.update_layout(
         map=dict(style="carto-positron", center=dict(lat=center_lat, lon=center_lon), zoom=zoom_level),
@@ -104,12 +123,15 @@ with map_col:
 with info_col:
     clicked_row = None
     if event and event.selection and event.selection["points"]:
-        point = event.selection["points"][0]
-        curve_idx = point["curve_number"]
-        point_idx = point["point_index"]
-        ref_df = trace_refs[curve_idx]
-        if ref_df is not None and point_idx < len(ref_df):
-            clicked_row = ref_df.iloc[point_idx]
+        try:
+            point = event.selection["points"][0]
+            curve_idx = point["curve_number"]
+            point_idx = point.get("point_index", 0)  # 핀(폴리곤) 트레이스는 point_index가 없을 수 있어 기본값 처리
+            ref_df = trace_refs[curve_idx]
+            if ref_df is not None and point_idx < len(ref_df):
+                clicked_row = ref_df.iloc[point_idx]
+        except (KeyError, IndexError):
+            clicked_row = None  # 핀 클릭 이벤트 형식이 달라 못 읽어도 앱이 죽지 않게
 
     display_row = clicked_row if clicked_row is not None else (matched.iloc[0] if len(matched) > 0 else None)
 
