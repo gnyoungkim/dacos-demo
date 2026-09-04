@@ -9,6 +9,14 @@ THREE = ["대전", "대구", "부산"]
 SIDO_FULL = {"대전": "대전광역시", "대구": "대구광역시", "부산": "부산광역시"}
 GRADE_COLORS = {1: "#7f1d1d", 2: "#dc2626", 3: "#f97316", 4: "#fbbf24", 5: "#7dd3fc"}
 
+# 1~2등급은 확실히 크게, 3~5등급도 색이 흐려서 안 보이던 문제 해결 위해 최소 크기/투명도 상향
+GRADE_SIZE = {1: 16, 2: 13, 3: 10, 4: 9, 5: 8}
+GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.8, 4: 0.75, 5: 0.7}
+
+# 검색 강조 배율 — 색은 그대로, 크기만 키우고 완전 불투명으로
+HIGHLIGHT_SIZE_MULT = 2.2
+HIGHLIGHT_OPACITY = 1.0
+
 
 @st.cache_data
 def load_data():
@@ -43,7 +51,6 @@ if query:
         center_lon = float(matched.iloc[0]["경도"])
         zoom_level = 13
 
-# ── 화면을 좌(지도) : 우(카드) = 7 : 3 비율로 분할 ──
 map_col, info_col = st.columns([7, 3])
 
 with map_col:
@@ -57,29 +64,35 @@ with map_col:
 
     trace_refs = [None]
 
-    for g, color in GRADE_COLORS.items():
+    # 낮은 등급(5→1 순)부터 그려서, 위험도가 높을수록 항상 위에 겹쳐 보이게 함
+    for g in sorted(GRADE_COLORS, reverse=True):
+        color = GRADE_COLORS[g]
         sub = df_map[df_map["등급"] == g].reset_index(drop=True)
         trace_refs.append(sub)
         fig.add_trace(go.Scattermap(
             lat=sub["위도"], lon=sub["경도"], mode="markers",
-            marker=dict(size=10 if g <= 2 else 6, color=color, opacity=0.9 if g <= 2 else 0.4),
+            marker=dict(size=GRADE_SIZE[g], color=color, opacity=GRADE_OPACITY[g]),
             text=sub["학교명"],
             hoverinfo="text", name=f"{g}등급",
         ))
 
+    # 검색된 학교 — 등급별 원래 색 그대로, 크기만 키우고 완전 불투명으로 강조
     if len(matched) > 0:
-        trace_refs.append(matched)
-        fig.add_trace(go.Scattermap(
-            lat=matched["위도"], lon=matched["경도"], mode="markers",
-            marker=dict(size=22, color="#000000", opacity=0.9),
-            text=matched["학교명"] + " (검색됨)",
-            hoverinfo="text", name="검색 결과",
-        ))
+        for g in matched["등급"].unique():
+            m_sub = matched[matched["등급"] == g].reset_index(drop=True)
+            trace_refs.append(m_sub)
+            fig.add_trace(go.Scattermap(
+                lat=m_sub["위도"], lon=m_sub["경도"], mode="markers",
+                marker=dict(size=GRADE_SIZE[g] * HIGHLIGHT_SIZE_MULT,
+                            color=GRADE_COLORS[g], opacity=HIGHLIGHT_OPACITY),
+                text=m_sub["학교명"] + " (검색됨)",
+                hoverinfo="text", name="검색 결과",
+            ))
 
     fig.update_layout(
         map=dict(style="carto-positron", center=dict(lat=center_lat, lon=center_lon), zoom=zoom_level),
         height=650, margin=dict(l=0, r=0, t=10, b=0),
-        showlegend=False,  # 옆에 카드가 있으니 범례는 공간 절약을 위해 생략 (원하면 True로 되돌리기)
+        showlegend=False,
     )
 
     event = st.plotly_chart(
