@@ -11,11 +11,11 @@ SIDO_FULL = {"대전": "대전광역시", "대구": "대구광역시", "부산":
 GRADE_COLORS = {1: "#7f1d1d", 2: "#dc2626", 3: "#f97316", 4: "#fbbf24", 5: "#7dd3fc"}
 
 # 평소(검색 안 했을 때) 크기/투명도
-GRADE_SIZE = {1: 16, 2: 13, 3: 10, 4: 9, 5: 8}
+GRADE_SIZE = {1: 20, 2: 17, 3: 13, 4: 12, 5: 11}
 GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.8, 4: 0.75, 5: 0.7}
 
 # 검색 중일 때 — 3~5등급도 주변 맥락 파악하게 크기·진하기 상향
-GRADE_SIZE_SEARCH = {1: 16, 2: 13, 3: 13, 4: 12, 5: 11}
+GRADE_SIZE_SEARCH = {1: 20, 2: 17, 3: 16, 4: 15, 5: 14}
 GRADE_OPACITY_SEARCH = {1: 1.0, 2: 0.95, 3: 0.95, 4: 0.9, 5: 0.85}
 
 # 유형별 배지 색상 — 순전출형은 파란 계열, 인구감소형은 빨간 계열, 비위험은 회색
@@ -111,7 +111,7 @@ with map_col:
     # 검색된 학교 — 진짜 핀(물방울) 모양 다각형. 색은 그 학교의 등급 색 그대로.
     if len(matched) > 0:
         for i, m_row in matched.iterrows():
-            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.002)
+            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.0008)
             pin_geojson = {
                 "type": "FeatureCollection",
                 "features": [{
