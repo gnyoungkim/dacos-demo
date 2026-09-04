@@ -33,7 +33,7 @@ def type_badge(유형):
     style = TYPE_STYLE.get(유형, TYPE_STYLE["비위험"])
     return (
         f"<span style='background-color:{style['bg']}; color:{style['fg']}; "
-        f"padding:4px 12px; border-radius:6px; font-weight:600; font-size:0.95rem;'>"
+        f"padding:8px 20px; border-radius:8px; font-weight:700; font-size:1.3rem;'>"
         f"{유형}</span>"
     )
 
