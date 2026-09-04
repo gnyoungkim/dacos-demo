@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import geopandas as gpd
 import plotly.graph_objects as go
 
@@ -10,42 +9,19 @@ THREE = ["대전", "대구", "부산"]
 SIDO_FULL = {"대전": "대전광역시", "대구": "대구광역시", "부산": "부산광역시"}
 GRADE_COLORS = {1: "#7f1d1d", 2: "#dc2626", 3: "#f97316", 4: "#fbbf24", 5: "#7dd3fc"}
 
-# 평소(검색 안 했을 때) 원 반지름 — 지도 위 실제 크기(도 단위). 확대하면 커지고 축소하면 작아짐
-GRADE_SIZE_DEG = {1: 0.0035, 2: 0.003, 3: 0.0022, 4: 0.002, 5: 0.0018}
-GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.8, 4: 0.75, 5: 0.7}
+# 네이버 지도 기본 마커 규격(25~34px, 커스텀 최대 64px) 참고해 화면 픽셀 고정 크기로 설정.
+# Scattermap의 marker.size는 화면 픽셀 단위라 확대·축소해도 이 크기 그대로 유지된다.
+GRADE_SIZE = {1: 22, 2: 18, 3: 14, 4: 13, 5: 12}
+GRADE_OPACITY = {1: 1.0, 2: 0.95, 3: 0.85, 4: 0.8, 5: 0.75}
 
-# 검색 중일 때 — 3~5등급도 주변 맥락 파악하게 크기·진하기 상향
-GRADE_SIZE_DEG_SEARCH = {1: 0.0035, 2: 0.003, 3: 0.0028, 4: 0.0026, 5: 0.0024}
+# 검색 중일 때 3~5등급도 주변 맥락 파악하게 살짝 키움 (역시 픽셀 고정)
+GRADE_SIZE_SEARCH = {1: 22, 2: 18, 3: 17, 4: 16, 5: 15}
 GRADE_OPACITY_SEARCH = {1: 1.0, 2: 0.95, 3: 0.95, 4: 0.9, 5: 0.85}
 
+# 검색된 학교 강조 크기 — 고정 40px (요청하신 값)
+SEARCH_HIGHLIGHT_SIZE = 40
 
-def circle_polygon(lon, lat, r_deg, n=14):
-    """지도 위경도 기준 원 폴리곤. 실제 땅 크기라 확대하면 커지고 축소하면 작아짐(핀과 동일한 방식)."""
-    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
-    xs = lon + r_deg * np.cos(angles)
-    ys = lat + r_deg * np.sin(angles)
-    coords = list(zip(xs, ys)) + [(xs[0], ys[0])]
-    return coords
-
-
-@st.cache_data
-def build_grade_geojsons(df_map, size_map):
-    """학교급별 원 폴리곤 geojson을 미리 만들어 캐싱 (매번 새로 계산하면 느려서)."""
-    result = {}
-    for g, r in size_map.items():
-        sub = df_map[df_map["등급"] == g].reset_index(drop=True)
-        features = []
-        for i, row in sub.iterrows():
-            coords = circle_polygon(row["경도"], row["위도"], r)
-            features.append({
-                "type": "Feature", "id": i,
-                "geometry": {"type": "Polygon", "coordinates": [coords]},
-                "properties": {},
-            })
-        result[g] = ({"type": "FeatureCollection", "features": features}, sub)
-    return result
-
-# 유형별 배지 색상 — 순전출형은 파란 계열, 인구감소형은 빨간 계열, 비위험은 회색
+# 유형별 배지 색상
 TYPE_STYLE = {
     "순전출형": {"bg": "#dbeafe", "fg": "#1e40af"},
     "인구감소형": {"bg": "#fee2e2", "fg": "#991b1b"},
@@ -60,16 +36,6 @@ def type_badge(유형):
         f"padding:4px 12px; border-radius:6px; font-weight:600; font-size:0.95rem;'>"
         f"{유형}</span>"
     )
-
-
-def pin_polygon(lon, lat, size_deg=0.015, n=24):
-    """지도 위경도 기준 핀(물방울) 모양 폴리곤 좌표를 만든다. 뾰족한 끝이 정확히 학교 위치(lon, lat)."""
-    head_lat = lat + size_deg * 1.4
-    angles = np.linspace(np.radians(200), np.radians(-20), n)
-    arc_lon = lon + size_deg * np.cos(angles)
-    arc_lat = head_lat + size_deg * np.sin(angles)
-    coords = list(zip(arc_lon, arc_lat)) + [(lon, lat), (arc_lon[0], arc_lat[0])]
-    return coords
 
 
 @st.cache_data
@@ -89,7 +55,7 @@ sgg3, geojson = load_boundary()
 df_map = df[df["시도"].isin(THREE)].dropna(subset=["위도", "경도"]).copy()
 
 st.title("🏫 학생수 감소 조기진단")
-st.caption("학교명을 검색하거나, 지도 위 점을 클릭하면 오른쪽에 상세정보가 뜹니다")
+st.caption("학교명을 검색하거나, 지도 위 점을 클릭하면 오른쪽에 상세정보가 뜹니다. 마커 크기는 확대·축소와 무관하게 고정됩니다")
 
 query = st.text_input("학교명 검색 (예: 대구명곡초)")
 
@@ -118,47 +84,37 @@ with map_col:
 
     trace_refs = [None]
 
-    # 검색 중이면 3~5등급도 크고 진하게 보이는 값을 쓴다
     is_searching = len(matched) > 0
-    size_map = GRADE_SIZE_DEG_SEARCH if is_searching else GRADE_SIZE_DEG
+    size_map = GRADE_SIZE_SEARCH if is_searching else GRADE_SIZE
     opacity_map = GRADE_OPACITY_SEARCH if is_searching else GRADE_OPACITY
 
-    # 원을 실제 땅 크기 폴리곤으로 그려서, 확대하면 커지고 축소하면 작아지게 함 (핀과 동일 원리)
-    geojsons = build_grade_geojsons(df_map, size_map)
-
-    # 낮은 등급(5→1 순)부터 그려서, 위험도가 높을수록 항상 위에 겹쳐 보이게 함
     for g in sorted(GRADE_COLORS, reverse=True):
         color = GRADE_COLORS[g]
-        geojson_g, sub = geojsons[g]
+        sub = df_map[df_map["등급"] == g].reset_index(drop=True)
         trace_refs.append(sub)
-        fig.add_trace(go.Choroplethmap(
-            geojson=geojson_g, locations=list(range(len(sub))), z=[1] * len(sub),
-            colorscale=[[0, color], [1, color]], showscale=False,
-            marker=dict(opacity=opacity_map[g], line=dict(width=0)),
-            hovertext=sub["학교명"], hoverinfo="text", name=f"{g}등급",
+        fig.add_trace(go.Scattermap(
+            lat=sub["위도"], lon=sub["경도"], mode="markers",
+            marker=dict(size=size_map[g], color=color, opacity=opacity_map[g]),
+            text=sub["학교명"],
+            hoverinfo="text", name=f"{g}등급",
         ))
 
-    # 검색된 학교 — 진짜 핀(물방울) 모양 다각형. 색은 그 학교의 등급 색 그대로.
     if len(matched) > 0:
-        for i, m_row in matched.iterrows():
-            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.0008)
-            pin_geojson = {
-                "type": "FeatureCollection",
-                "features": [{
-                    "type": "Feature", "id": 0,
-                    "geometry": {"type": "Polygon", "coordinates": [coords]},
-                    "properties": {},
-                }],
-            }
-            g = int(m_row["등급"])
-            fig.add_trace(go.Choroplethmap(
-                geojson=pin_geojson, locations=[0], z=[1],
-                colorscale=[[0, GRADE_COLORS[g]], [1, GRADE_COLORS[g]]], showscale=False,
-                marker=dict(opacity=1.0, line=dict(width=1.5, color="white")),
-                hovertext=m_row["학교명"] + " (검색됨)", hoverinfo="text",
-                name="검색 결과",
-            ))
-            trace_refs.append(pd.DataFrame([m_row]))  # 핀 트레이스도 클릭하면 정보 뜨게 등록
+        trace_refs.append(matched)
+        fig.add_trace(go.Scattermap(
+            lat=matched["위도"], lon=matched["경도"], mode="markers",
+            marker=dict(size=SEARCH_HIGHLIGHT_SIZE + 6, color="white", opacity=1.0),
+            hoverinfo="skip", showlegend=False,
+        ))
+        trace_refs.append(matched)
+        fig.add_trace(go.Scattermap(
+            lat=matched["위도"], lon=matched["경도"], mode="markers",
+            marker=dict(size=SEARCH_HIGHLIGHT_SIZE,
+                        color=[GRADE_COLORS[int(g)] for g in matched["등급"]],
+                        opacity=1.0),
+            text=matched["학교명"] + " (검색됨)",
+            hoverinfo="text", name="검색 결과",
+        ))
 
     fig.update_layout(
         map=dict(style="carto-positron", center=dict(lat=center_lat, lon=center_lon), zoom=zoom_level),
@@ -177,15 +133,12 @@ with info_col:
         try:
             point = event.selection["points"][0]
             curve_idx = point["curve_number"]
-            # Choroplethmap(원·핀 폴리곤)은 point_index 대신 location 키로 반환되는 경우가 있어 둘 다 확인
-            point_idx = point.get("point_index")
-            if point_idx is None:
-                point_idx = point.get("location", 0)
+            point_idx = point["point_index"]
             ref_df = trace_refs[curve_idx]
             if ref_df is not None and point_idx < len(ref_df):
                 clicked_row = ref_df.iloc[point_idx]
         except (KeyError, IndexError):
-            clicked_row = None  # 핀 클릭 이벤트 형식이 달라 못 읽어도 앱이 죽지 않게
+            clicked_row = None
 
     display_row = clicked_row if clicked_row is not None else (matched.iloc[0] if len(matched) > 0 else None)
 
