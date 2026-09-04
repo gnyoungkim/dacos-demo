@@ -54,7 +54,7 @@ df = load_data()
 sgg3, geojson = load_boundary()
 df_map = df[df["시도"].isin(THREE)].dropna(subset=["위도", "경도"]).copy()
 
-st.title("🏫 스쿨캐스터")
+st.title("🏫 스쿨캐스터 School-Caster")
 st.caption("학교명을 검색하거나, 지도 위 점을 클릭하면 오른쪽에 상세정보가 뜹니다.")
 
 query = st.text_input("학교명 검색 (예: 대구명곡초)")
