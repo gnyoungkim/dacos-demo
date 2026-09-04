@@ -154,7 +154,7 @@ with info_col:
             st.write("유형")
             st.markdown(type_badge(r["유형"]), unsafe_allow_html=True)
 
-        st.markdown(f"<p style='font-size:1.15rem;'><b>위치</b>: {r['시도']} {r['행정구']}</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:1.15rem;'><b>학교급</b>: {r['학교급']}</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:1.15rem;'><b>학생수</b>: {int(r['n0'])}명</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:1.15rem;'><b>예측 변화</b>: {r['y']*100:.1f}%</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:2rem;'><b>위치</b>: {r['시도']} {r['행정구']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:2rem;'><b>학교급</b>: {r['학교급']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:2rem;'><b>학생수</b>: {int(r['n0'])}명</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:2rem;'><b>예측 변화</b>: {r['y']*100:.1f}%</p>", unsafe_allow_html=True)
