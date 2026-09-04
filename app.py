@@ -76,7 +76,7 @@ with map_col:
             hoverinfo="text", name=f"{g}등급",
         ))
 
-    # 검색된 학교 — 등급별 원래 색 그대로, 크기만 키우고 완전 불투명으로 강조
+    # 검색된 학교 — 등급별 원래 색 그대로, 핀 모양 + 크기 확대로 강조
     if len(matched) > 0:
         for g in matched["등급"].unique():
             m_sub = matched[matched["등급"] == g].reset_index(drop=True)
@@ -84,7 +84,8 @@ with map_col:
             fig.add_trace(go.Scattermap(
                 lat=m_sub["위도"], lon=m_sub["경도"], mode="markers",
                 marker=dict(size=GRADE_SIZE[g] * HIGHLIGHT_SIZE_MULT,
-                            color=GRADE_COLORS[g], opacity=HIGHLIGHT_OPACITY),
+                            color=GRADE_COLORS[g], opacity=HIGHLIGHT_OPACITY,
+                            symbol="marker"),  # 동그라미 대신 지도 핀 모양
                 text=m_sub["학교명"] + " (검색됨)",
                 hoverinfo="text", name="검색 결과",
             ))
