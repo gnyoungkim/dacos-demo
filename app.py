@@ -103,7 +103,7 @@ with map_col:
         trace_refs.append(matched)
         fig.add_trace(go.Scattermap(
             lat=matched["위도"], lon=matched["경도"], mode="markers",
-            marker=dict(size=SEARCH_HIGHLIGHT_SIZE + 6, color="white", opacity=1.0),
+            marker=dict(size=SEARCH_HIGHLIGHT_SIZE + 6, color="#111827", opacity=1.0),  # 짙은 남색 테두리
             hoverinfo="skip", showlegend=False,
         ))
         trace_refs.append(matched)
