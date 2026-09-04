@@ -154,10 +154,7 @@ with info_col:
             st.write("유형")
             st.markdown(type_badge(r["유형"]), unsafe_allow_html=True)
 
-        st.write(f"**위치**: {r['시도']} {r['행정구']}")
-        st.write(f"**학교급**: {r['학교급']}")
-        st.write(f"**학생수**: {int(r['n0'])}명")
-        st.write(f"**예측 변화**: {r['y']*100:.1f}%")
-    else:
-        st.info("지도 위 점을 클릭하거나\n학교명을 검색해보세요")
-        st.write(f"전체 등록 학교 수(3개 시): {len(df_map):,}개교")
+        st.markdown(f"<p style='font-size:1.15rem;'><b>위치</b>: {r['시도']} {r['행정구']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:1.15rem;'><b>학교급</b>: {r['학교급']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:1.15rem;'><b>학생수</b>: {int(r['n0'])}명</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:1.15rem;'><b>예측 변화</b>: {r['y']*100:.1f}%</p>", unsafe_allow_html=True)
