@@ -90,7 +90,7 @@ with map_col:
     # 검색된 학교 — 진짜 핀(물방울) 모양 다각형. 색은 그 학교의 등급 색 그대로.
     if len(matched) > 0:
         for i, m_row in matched.iterrows():
-            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.012)
+            coords = pin_polygon(float(m_row["경도"]), float(m_row["위도"]), size_deg=0.001)
             pin_geojson = {
                 "type": "FeatureCollection",
                 "features": [{
