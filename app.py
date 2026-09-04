@@ -4,6 +4,15 @@ import geopandas as gpd
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="학생수 감소 조기진단", layout="wide")
+st.markdown("""
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css');
+
+html, body, [class*="css"], .stApp, .stMarkdown, .stText, p, span, div, h1, h2, h3, h4, h5, h6 {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 THREE = ["대전", "대구", "부산"]
 SIDO_FULL = {"대전": "대전광역시", "대구": "대구광역시", "부산": "부산광역시"}
